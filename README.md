@@ -55,6 +55,47 @@ jobs:
 
 Then you should be good to go. Note that I might not have bumped the version in `^`, so double [check the releases.](https://github.com/OSS-Docs-Tools/code-owner-self-merge/releases)
 
+If you want to bypass a branch protection rule, you will need to use a GitHub App token instead of an automatically generated GITHUB_TOKEN.
+
+```yml
+name: 'Codeowners merging'
+on:
+  issue_comment: { types: [created] }
+  pull_request_review: { types: [submitted] }
+  
+jobs:
+  codeowners-merge:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    environment: 'PR self-merge'
+    steps:
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.KUBA_GITHUB_APP_ID }}
+          private-key: ${{ secrets.KUBA_GITHUB_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: 'Run Codeowners merge check'
+        uses: KUBA-ENG-Platform/code-owner-self-merge@main
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+```
+
+Follow the [`official guide`](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/making-authenticated-api-requests-with-a-github-app-in-a-github-actions-workflow) to register an app in your GitHub organization, and add the app id and private key to an environment in your repository's variables and secrets respectively. This environment need to be restricted to your main branch so no one can use it on your behalf.
+
+Update your ruleset bypass list to include your GitHub App. 
+
+Permissions needed by the app are:
+* Repository Actions (Read and write)
+* Repository Contents (Read and write)
+* Repository Commit statuses (Read-only)
+* Repository Pull requests (Read and write)
+* Organizations Members (Read-only)
+
 ### Security
 
 We force the use of [`pull_request_target`](https://github.blog/2020-08-03-github-actions-improvements-for-fork-and-pull-request-workflows/) as a workflow event to ensure that someone cannot change the CODEOWNER files at the same time as having that change be used to validate if they can merge.
